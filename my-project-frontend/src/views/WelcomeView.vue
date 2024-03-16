@@ -1,5 +1,16 @@
 <script setup>
-
+import {useDark, useToggle} from "@vueuse/core";
+useDark({
+  selector:"html",
+  attribute:"class",
+  valueDark:'dark',
+  valueLight:"light"
+})
+useDark({
+  onChanged(dark){useToggle((dark))}
+})
+const isDark = useDark()
+const toggleDark = useToggle(useDark())
 </script>
 <template>
   <div style="width: 100vw;height: 100vh;overflow: hidden;display: flex">
@@ -13,6 +24,11 @@
       <div style="margin-top: 5px">在这里你可以同性交友，因为都是男的，没有学Java的女生。</div>
     </div>
     <div class="right-card">
+      <div class="bt" >
+        <el-button @click="toggleDark()">
+          {{ isDark ? 'Dark' : 'Light' }}
+        </el-button>
+      </div>
       <router-view v-slot="{ Component }">
         <transition name="el-fade-in-linear" mode="out-in">
           <component :is="Component"/>
@@ -33,6 +49,12 @@
 .right-card{
   width: 400px;
   z-index: 1;
-  background: white;
+  background: var(--el-bg-color);
+}
+.right-card .bt{
+  margin-top: 10px;
+  margin-right: 10px;
+  font-weight: bold;
+  float: right;
 }
 </style>
