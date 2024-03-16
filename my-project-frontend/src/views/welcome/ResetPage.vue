@@ -12,7 +12,7 @@
         <div style="font-size: 14px ;color: grey">请输入需要重置密码的电子邮件地址</div>
       </div>
       <div style="margin-top: 50px">
-        <el-form :model="form">
+        <el-form :model="form" :rules="rules" ref="formRef">
           <el-form-item prop="email">
             <el-input v-model="form.email" type="email" placeholder="电子邮件地址">
               <template #prefix>
@@ -34,8 +34,8 @@
                 </el-input>
               </el-col>
               <el-col :span="5">
-                <el-button type="success">
-                  获取验证码
+                <el-button @click="askCode" :disabled="!isEmailValid || coldTime > 0" type="success">
+                  {{ coldTime > 0 ? '请稍后 ' + coldTime + ' 秒' : '获取验证码' }}
                 </el-button>
               </el-col>
             </el-row>
@@ -43,7 +43,7 @@
         </el-form>
       </div>
       <div style="margin-top: 70px">
-        <el-button @click="active++" style="width: 280px" type="warning" plain>开始重置密码</el-button>
+        <el-button @click="confirmRest" style="width: 280px" type="warning" plain>开始重置密码</el-button>
       </div>
     </div>
     <div style="margin: 0 20px" v-if="active===1">
@@ -52,7 +52,7 @@
         <div style="font-size: 14px ;color: grey">请填写你的新密码，无比牢记，请勿丢失</div>
       </div>
       <div style="margin-top: 50px">
-        <el-form :model="form">
+        <el-form :model="form" :rules="rules" ref="formRef">
           <el-form-item prop="password">
             <el-input v-model="form.password" maxlength="20" type="password" placeholder="请输入密码">
               <template #prefix>
@@ -74,7 +74,7 @@
         </el-form>
       </div>
       <div style="margin-top: 70px">
-        <el-button @click="active++" style="width: 280px" type="danger" plain>立即重置密码</el-button>
+        <el-button @click="doRest" style="width: 280px" type="danger" plain>立即重置密码</el-button>
       </div>
     </div>
   </div>
@@ -83,14 +83,88 @@
 <script setup>
 import {EditPen, Message,Lock} from "@element-plus/icons-vue";
 
-import {reactive, ref} from "vue";
+import {computed, reactive, ref} from "vue";
+import {get, post} from "@/net/index.js";
+import {ElMessage} from "element-plus";
+import router from "@/router/index.js";
 
+const formRef = ref()
 const active = ref(0)
+const coldTime=ref(0)
 const form = reactive({
   email: "",
   code: "",
   password:"",
   password_repeat:"",
+})
+
+const validatePassword = (rule, value, callback) => {
+  if (value === '') {
+    callback(new Error("请在此输入密码"))
+  } else if (value !== form.password)
+    callback(new Error("两次密码不一致"))
+  else
+    callback()
+}
+const rules = {
+  password: [
+    {required: true, message: '请输入密码', trigger: 'blur'},
+    {min: 6, max: 20, message: "密码长度必须在6-20个字符之间", trigger: ['blur', 'change']}
+  ],
+  password_repeat: [
+    {validator: validatePassword, trigger: ['blur', 'change']}
+  ],
+  email: [
+    {required: true, message: '请输入邮件地址', trigger: 'blur'},
+    {type: "email", message: "请输入合法的邮件地址", trigger: ['blur', 'change']}
+  ],
+  code: [
+    {required: true, message: "请输入获取的验证码", trigger: 'blur'}
+  ]
+
+}
+
+function askCode() {
+  if (isEmailValid) {
+    coldTime.value = 60
+    console.log(form.email)
+    get(`/api/auth/ask-code?email=${form.email}&type=register`, () => {
+      ElMessage.success(`验证码已经发送到邮箱:${form.email},请注意查收`)
+      setInterval(() => coldTime.value--, 1000)
+    }, (message) => {
+      ElMessage.warning(message)
+      coldTime.value = 0
+    })
+  } else {
+    ElMessage.warning("请输入正确的电子邮件");
+  }
+}
+
+function confirmRest(){
+  formRef.value.validate((valid)=>{
+    if (valid){
+      post('/api/auth/reset-confirm',{
+        email: form.email,
+        code: form.code
+      },() => active.value++)
+    }
+  })
+}
+
+function doRest(){
+  formRef.value.validate((valid)=> {
+    if (valid) {
+      post('/api/auth/reset-password',{...form},
+          ()=>{
+          ElMessage.success("密码重置成功，请重新登录")
+            router.push('/')
+          })
+    }
+  })
+}
+
+const isEmailValid = computed(() => {
+  return /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(form.email)
 })
 
 </script>
